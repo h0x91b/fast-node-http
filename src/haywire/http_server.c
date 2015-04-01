@@ -174,7 +174,7 @@ int hw_http_open(int threads)
         uv_tcp_bind(&server, (const struct sockaddr*)&listen_address, 0);
         uv_listen((uv_stream_t*)&server, 128, http_stream_on_connect);
         printf("Listening on %s:%d\n", config->http_listen_address, config->http_listen_port);
-        uv_run(uv_loop, UV_RUN_DEFAULT);
+        //uv_run(uv_loop, UV_RUN_DEFAULT);
     }
     else
     {

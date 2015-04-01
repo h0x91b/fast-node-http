@@ -6,7 +6,7 @@
   "engines" : { "node" : ">=0.12" },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "install": "node-gyp rebuild -Duv_library=static_library"
+    "install": "node-gyp rebuild"
   },
   "repository": {
     "type": "git",
