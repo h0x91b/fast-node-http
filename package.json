@@ -1,0 +1,25 @@
+{
+  "name": "fast-node-http",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "engines" : { "node" : ">=0.12" },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild -Duv_library=static_library"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/h0x91b/fast-node-http.git"
+  },
+  "author": "Arseniy Pavlenko (h0x91b)",
+  "license": "ISC",
+  "gypfile": true,
+  "bugs": {
+    "url": "https://github.com/h0x91b/fast-node-http/issues"
+  },
+  "homepage": "https://github.com/h0x91b/fast-node-http",
+  "dependencies": {
+    "nan": "^1.7.0"
+  }
+}
