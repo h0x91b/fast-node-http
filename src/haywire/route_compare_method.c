@@ -13,6 +13,7 @@ static char route_key[2048];
 
 int hw_route_compare_method(char *url, char* route)
 {
+	return 1;
     int equal = 0;
     char *route_token;
     char *route_token_ptr;

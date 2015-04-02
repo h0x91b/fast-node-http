@@ -117,7 +117,7 @@ int hw_init_with_config(configuration* c)
     
     http_v1_0 = create_string("HTTP/1.0 ");
     http_v1_1 = create_string("HTTP/1.1 ");
-    server_name = create_string("Server: Haywire/master");
+    server_name = create_string("Server: h0x91B");
     return 0;
 }
 
@@ -255,7 +255,7 @@ int http_server_write_response(hw_write_context* write_context, hw_string* respo
     uv_buf_t* resbuf = (uv_buf_t *)(write_req+1);
     
     resbuf->base = response->value;
-    resbuf->len = response->length + 1;
+    resbuf->len = response->length;// + 1;
     
     write_req->data = write_context;
     

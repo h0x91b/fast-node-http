@@ -114,6 +114,7 @@ int http_request_on_url(http_parser *parser, const char *at, size_t length)
 
     strncpy(data, at, length);
     data[length] = '\0';
+	 
 
     connection->request->url = data;
 
@@ -271,15 +272,17 @@ int http_request_on_message_complete(http_parser* parser)
     }
     else
     {
-        // 404 Not Found.
-        write_context = malloc(sizeof(hw_write_context));
-        write_context->connection = connection;
-        write_context->callback = 0;
-        get_404_response(connection->request, (http_response*)response);
-        response_buffer = create_response_buffer(response);
-        http_server_write_response(write_context, response_buffer);
-        free(response_buffer);
-        hw_free_http_response(response);
+		 route_entry = get_route_callback("404");
+		 route_entry->callback(connection->request, response, route_entry->user_data);
+        // // 404 Not Found.
+        // write_context = malloc(sizeof(hw_write_context));
+        // write_context->connection = connection;
+        // write_context->callback = 0;
+        // get_404_response(connection->request, (http_response*)response);
+        // response_buffer = create_response_buffer(response);
+        // http_server_write_response(write_context, response_buffer);
+        // free(response_buffer);
+        // hw_free_http_response(response);
     }
     
     free_http_request(connection->request);
