@@ -8,6 +8,7 @@ using namespace v8;
 #include <stdlib.h>
 #include <string.h>
 #include "haywire.h"
+#include "src/haywire/khash.h"
 
 #define CRLF "\r\n"
 
@@ -26,8 +27,11 @@ struct Response {
 	void* user_data;
 };
 
-void get_root(http_request* request, hw_http_response* response, void* user_data)
+KHASH_MAP_INIT_STR(string_hashmap, char*)
+
+void requestHandler(http_request* request, hw_http_response* response, void* user_data)
 {
+	NanScope();
 	Response *resp = (Response*)malloc(sizeof(Response));
 	resp->request = request;
 	resp->response = response;
@@ -36,11 +40,33 @@ void get_root(http_request* request, hw_http_response* response, void* user_data
 	
 	Local<Object> jsReq = NanNew<Object>();
 	jsReq->Set(NanNew<String>("url"), NanNew<String>(request->url));
+	switch(request->method) {
+		case HW_HTTP_GET:
+			jsReq->Set(NanNew<String>("method"), NanNew<String>("GET")); break;
+		case HW_HTTP_POST:
+			jsReq->Set(NanNew<String>("method"), NanNew<String>("POST")); break;
+		case HW_HTTP_OPTIONS:
+			jsReq->Set(NanNew<String>("method"), NanNew<String>("OPTIONS")); break;
+		default:
+			jsReq->Set(NanNew<String>("method"), NanNew<String>("UNIMPLEMENTED")); break;
+	}
+	
+	
+	const char* k;
+	const char* v;
+	Local<Object> jsHeaders = NanNew<Object>();
+
+	khash_t(string_hashmap) *h = (kh_string_hashmap_t*)request->headers;
+	kh_foreach(h, k, v, { 
+		// printf("KEY: %s VALUE: %s\n", k, v);
+		jsHeaders->Set(NanNew<String>(k), NanNew<String>(v));
+	});
+	
+	jsReq->Set(NanNew<String>("headers"), jsHeaders);
 	
 	Local<Object> jsRes = NanNew<Object>();
 	jsRes->Set(NanNew<String>("external"), external);
 	
-	// Local<Object> wrapper = NanNew(Response::New)->NewInstance();
 	Local<Value> argv[2] = {
 		jsReq,
 		jsRes
@@ -83,28 +109,6 @@ void get_root(http_request* request, hw_http_response* response, void* user_data
 	// char *user_dataStr = "user_data";
 	//
 	// hw_http_response_send(response, user_dataStr, response_complete);
-}
-
-NAN_METHOD(JsSetHeader) {
-	NanScope();
-	
-	// Local<External> ext = args[0].As<External>();
-	// void* ptr = ext->Value();
-	// Response *resp =  static_cast<Response *>(ptr);
-	//
-	// hw_string name;
-	// strTmp = new NanUtf8String(args[1]);
-	// name.value = **strTmp;
-	// name.length = (*strTmp).length();
-	//
-	// hw_string value;
-	// strTmp = new NanUtf8String(args[2]);
-	// value.value = **strTmp;
-	// value.length = (*strTmp).length();
-	//
-	// hw_set_response_header(resp->response, &name, &value);
-	
-	NanReturnUndefined();
 }
 
 inline void allocStr(hw_string& target, NanUtf8String& str) {
@@ -167,22 +171,30 @@ NAN_METHOD(JsEnd) {
 NAN_METHOD(JsListen) {
 	NanScope();
 	
-	Local<Function> jsFn = Local<Function>::Cast(args[0]);
+	NanUtf8String jsPort(args[0]);
+	Local<Function> jsFn = Local<Function>::Cast(args[1]);
 	NanAssignPersistent(onRequestJsFnc, jsFn);
 	
 	char route[] = "404";
 	configuration config;
 	config.http_listen_address = "0.0.0.0";
-	config.http_listen_port = 8000;
-	config.unix_file = NULL;
-	//config.unix_file = "/tmp/app.sock";
+	if((*jsPort)[0] == '/') {
+		char *buf = (char*)malloc(jsPort.length());
+		memcpy(buf, *jsPort, jsPort.length());
+		config.http_listen_port = 0;
+		config.unix_file = buf;
+	} else {
+		config.http_listen_port = atoi(*jsPort);
+		config.unix_file = NULL;
+	}
 
 	/* hw_init_from_config("hello_world.conf"); */
 	hw_init_with_config(&config);
-	hw_http_add_route(route, get_root, NULL);
+	hw_http_add_route(route, requestHandler, NULL);
 	hw_http_open(0);
 	
-	NanReturnValue(NanNew<String>("world"));
+	// NanReturnValue(NanNew<String>("world"));
+	NanReturnUndefined();
 }
 
 void init(Handle<Object> exports) {
