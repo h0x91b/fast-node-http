@@ -28,7 +28,7 @@ struct Response {
 
 void get_root(http_request* request, hw_http_response* response, void* user_data)
 {
-	Response *resp = (response*)malloc(sizeof(Response));
+	Response *resp = (Response*)malloc(sizeof(Response));
 	resp->request = request;
 	resp->response = response;
 	resp->user_data = user_data;
@@ -174,6 +174,8 @@ NAN_METHOD(JsListen) {
 	configuration config;
 	config.http_listen_address = "0.0.0.0";
 	config.http_listen_port = 8000;
+	config.unix_file = NULL;
+	//config.unix_file = "/tmp/app.sock";
 
 	/* hw_init_from_config("hello_world.conf"); */
 	hw_init_with_config(&config);

@@ -38,6 +38,7 @@ KHASH_MAP_INIT_STR(string_hashmap, hw_route_entry*)
 
 static configuration* config;
 static uv_tcp_t server;
+static uv_pipe_t serverUnix;
 static http_parser_settings parser_settings;
 static struct sockaddr_in listen_address;
 
@@ -114,6 +115,7 @@ int hw_init_with_config(configuration* c)
     config = malloc(sizeof(configuration));
     config->http_listen_address = dupstr(c->http_listen_address);
     config->http_listen_port = c->http_listen_port;
+	config->unix_file = c->unix_file;
     
     http_v1_0 = create_string("HTTP/1.0 ");
     http_v1_1 = create_string("HTTP/1.1 ");
@@ -151,7 +153,11 @@ int hw_http_open(int threads)
     
     /* TODO: Use the return values from uv_tcp_init() and uv_tcp_bind() */
     uv_loop = uv_default_loop();
-    uv_tcp_init(uv_loop, &server);
+	if(config->unix_file) {
+		uv_pipe_init(uv_loop, &serverUnix, 0);
+	} else {
+		uv_tcp_init(uv_loop, &server);
+	}
     
     listener_async_handles = calloc(listener_count, sizeof(uv_async_t));
     listener_event_loops = calloc(listener_count, sizeof(uv_loop_t));
@@ -170,10 +176,16 @@ int hw_http_open(int threads)
         initialize_http_request_cache();
         http_request_cache_configure_listener(uv_loop, NULL);
         
-        uv_ip4_addr(config->http_listen_address, config->http_listen_port, &listen_address);
-        uv_tcp_bind(&server, (const struct sockaddr*)&listen_address, 0);
-        uv_listen((uv_stream_t*)&server, 128, http_stream_on_connect);
-        printf("Listening on %s:%d\n", config->http_listen_address, config->http_listen_port);
+		if(config->unix_file) {
+			uv_pipe_bind(&serverUnix, config->unix_file);
+			uv_listen((uv_stream_t*)&serverUnix, 512, http_stream_on_connect);
+			printf("Listening unix on %s\n", config->unix_file);
+		} else {
+			uv_ip4_addr(config->http_listen_address, config->http_listen_port, &listen_address);
+			uv_tcp_bind(&server, (const struct sockaddr*)&listen_address, 0);
+			uv_listen((uv_stream_t*)&server, 512, http_stream_on_connect);
+			printf("Listening tcp on %s:%d\n", config->http_listen_address, config->http_listen_port);
+		}
         //uv_run(uv_loop, UV_RUN_DEFAULT);
     }
     else

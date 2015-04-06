@@ -145,6 +145,7 @@ typedef struct
 {
     char* http_listen_address;
     int http_listen_port;
+	 char* unix_file;
 } configuration;
 
 typedef struct
