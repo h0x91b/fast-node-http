@@ -8,10 +8,10 @@ function Response(context) {
 
 Response.prototype = {
 	CODES: {
-		200: '200 OK',
-		404: '404 Not found',
-		403: '403 Forbidden',
-		501: 'Not Implemented'
+		200: 'HTTP/1.1 200 OK\r\n',
+		404: 'HTTP/1.1 404 Not found\r\n',
+		403: 'HTTP/1.1 403 Forbidden\r\n',
+		501: 'HTTP/1.1 501 Not Implemented\r\n'
 	},
 	end: function resEnd(str) {
 		if(typeof str === 'undefined') {

@@ -134,6 +134,8 @@ NAN_METHOD(JsEnd) {
 	Nan::Utf8String statusCode(info[1]);
 	allocStr(status_code, statusCode);
 	hw_set_response_status_code(resp->response, &status_code);
+	// SETSTRING(status_code, HTTP_STATUS_200);
+	// hw_set_response_status_code(resp->response, &status_code);
 	
 	const Local<Array> props = v8::Handle<v8::Array>::Cast(info[2]);
 	const uint32_t length = props->Length();

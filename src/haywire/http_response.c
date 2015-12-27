@@ -91,12 +91,22 @@ hw_string* create_response_buffer(hw_http_response* response)
     int header_buffer_incr = 512;
     int body_size = resp->body.length;
     int header_size_remaining = header_buffer_incr;
-    int response_size = header_size_remaining + sizeof(length_header) + num_chars(resp->body.length) + 2 * line_sep_size + body_size + 1;
+    int response_size = header_size_remaining + sizeof(length_header) + num_chars(resp->body.length) + 2 * line_sep_size + body_size;
 
     response_string->value = malloc(response_size);
 
     response_string->length = 0;
-    append_string(response_string, cached_entry);
+	append_string(response_string, &resp->status_code.value);
+	// APPENDSTRING(response_string, "HTTP/1.1 ");
+	// append_string(response_string, &resp->status_code.value);
+	// APPENDSTRING(response_string, CRLF);
+	// if(cached_entry) {
+// 		append_string(response_string, cached_entry);
+// 		printf("cached_entry: %s\n", cached_entry);
+// 	}
+// 	else {
+// 		printf("cached_entry failed to get\n");
+// 	}
     
     for (i=0; i< resp->number_of_headers; i++)
     {
@@ -126,10 +136,10 @@ hw_string* create_response_buffer(hw_http_response* response)
     {
         append_string(response_string, &resp->body);
     }
-    if(resp->keep_alive)
-	{
-		APPENDSTRING(response_string, CRLF);
-	}
+	//     if(resp->keep_alive)
+	// {
+	// 	APPENDSTRING(response_string, CRLF);
+	// }
     response_string->value[response_string->length] = '\0';
     return response_string;
 }
