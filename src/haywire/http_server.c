@@ -38,7 +38,6 @@ KHASH_MAP_INIT_STR(string_hashmap, hw_route_entry*)
 
 static configuration* config;
 static uv_tcp_t server;
-static uv_pipe_t serverUnix;
 static http_parser_settings parser_settings;
 static struct sockaddr_in listen_address;
 
@@ -51,6 +50,53 @@ int listener_count;
 uv_async_t* listener_async_handles;
 uv_loop_t* listener_event_loops;
 uv_barrier_t* listeners_created_barrier;
+
+int hw_init_with_config(configuration* c)
+{
+    int http_listen_address_length;
+#ifdef DEBUG
+    char route[] = "/stats";
+    hw_http_add_route(route, get_server_stats, NULL);
+#endif /* DEBUG */
+    /* Copy the configuration */
+    config = malloc(sizeof(configuration));
+    config->http_listen_address = dupstr(c->http_listen_address);
+    config->http_listen_port = c->http_listen_port;
+    config->thread_count = c->thread_count;
+    config->tcp_nodelay = c->tcp_nodelay;
+    config->parser = dupstr(c->parser);
+
+    http_v1_0 = create_string("HTTP/1.0 ");
+    http_v1_1 = create_string("HTTP/1.1 ");
+    server_name = create_string("Server: Haywire/master");
+
+    if (strcmp(config->parser, "http_parser") == 0)
+    {
+        http_stream_on_read = &http_stream_on_read_http_parser;
+    }
+    http_server_write_response = &http_server_write_response_single;
+    return 0;
+}
+
+int hw_init_from_config(char* configuration_filename)
+{
+    configuration* config = load_configuration(configuration_filename);
+    if (config == NULL)
+    {
+        return 1;
+    }
+    return hw_init_with_config(config);
+}
+
+void print_configuration()
+{
+    printf("Address: %s\nPort: %d\nThreads: %d\nParser: %s\nTCP No Delay: %s\n",
+           config->http_listen_address,
+           config->http_listen_port,
+           config->thread_count,
+           config->parser,
+           config->tcp_nodelay? "on": "off");
+}
 
 http_connection* create_http_connection()
 {
@@ -94,35 +140,6 @@ void hw_http_add_route(char *route, http_request_callback callback, void* user_d
     printf("Added route %s\n", route); // TODO: Replace with logging instead.
 }
 
-int hw_init_from_config(char* configuration_filename)
-{
-    configuration* config = load_configuration(configuration_filename);
-    if (config == NULL)
-    {
-        return 1;
-    }
-    return hw_init_with_config(config);
-}
-
-int hw_init_with_config(configuration* c)
-{
-    int http_listen_address_length;
-#ifdef DEBUG
-    char route[] = "/stats";
-    hw_http_add_route(route, get_server_stats, NULL);
-#endif /* DEBUG */
-    /* Copy the configuration */
-    config = malloc(sizeof(configuration));
-    config->http_listen_address = dupstr(c->http_listen_address);
-    config->http_listen_port = c->http_listen_port;
-	config->unix_file = c->unix_file;
-    
-    http_v1_0 = create_string("HTTP/1.0 ");
-    http_v1_1 = create_string("HTTP/1.1 ");
-    server_name = create_string("Server: h0x91B");
-    return 0;
-}
-
 void free_http_server()
 {
     /* TODO: Shut down accepting incoming requests */
@@ -133,8 +150,9 @@ void free_http_server()
     kh_destroy(string_hashmap, routes);
 }
 
-int hw_http_open(int threads)
+int hw_http_open()
 {
+    int threads = config->thread_count;
     uv_async_t* service_handle = 0;
 
     parser_settings.on_header_field = http_request_on_header_field;
@@ -153,11 +171,7 @@ int hw_http_open(int threads)
     
     /* TODO: Use the return values from uv_tcp_init() and uv_tcp_bind() */
     uv_loop = uv_default_loop();
-	if(config->unix_file) {
-		uv_pipe_init(uv_loop, &serverUnix, 0);
-	} else {
-		uv_tcp_init(uv_loop, &server);
-	}
+    uv_tcp_init(uv_loop, &server);
     
     listener_async_handles = calloc(listener_count, sizeof(uv_async_t));
     listener_event_loops = calloc(listener_count, sizeof(uv_loop_t));
@@ -176,17 +190,17 @@ int hw_http_open(int threads)
         initialize_http_request_cache();
         http_request_cache_configure_listener(uv_loop, NULL);
         
-		if(config->unix_file) {
-			uv_pipe_bind(&serverUnix, config->unix_file);
-			uv_listen((uv_stream_t*)&serverUnix, 512, http_stream_on_connect);
-			printf("Listening unix on %s\n", config->unix_file);
-		} else {
-			uv_ip4_addr(config->http_listen_address, config->http_listen_port, &listen_address);
-			uv_tcp_bind(&server, (const struct sockaddr*)&listen_address, 0);
-			uv_listen((uv_stream_t*)&server, 512, http_stream_on_connect);
-			printf("Listening tcp on %s:%d\n", config->http_listen_address, config->http_listen_port);
-		}
-        //uv_run(uv_loop, UV_RUN_DEFAULT);
+        uv_ip4_addr(config->http_listen_address, config->http_listen_port, &listen_address);
+        uv_tcp_bind(&server, (const struct sockaddr*)&listen_address, 0);
+        
+        if (config->tcp_nodelay) {
+            uv_tcp_nodelay(&server, 1);
+        }
+        
+        uv_listen((uv_stream_t*)&server, 128, http_stream_on_connect);
+        print_configuration();
+        printf("Listening...\n");
+        uv_run(uv_loop, UV_RUN_DEFAULT);
     }
     else
     {
@@ -209,7 +223,7 @@ int hw_http_open(int threads)
         uv_barrier_wait(listeners_created_barrier);
         initialize_http_request_cache();
         
-        start_connection_dispatching(UV_TCP, threads, servers, config->http_listen_address, config->http_listen_port);
+        start_connection_dispatching(UV_TCP, threads, servers, config->http_listen_address, config->http_listen_port, config->tcp_nodelay);
     }
     
     return 0;
@@ -241,7 +255,7 @@ void http_stream_on_close(uv_handle_t* handle)
     free_http_connection(connection);
 }
 
-void http_stream_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf)
+void http_stream_on_read_http_parser(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf)
 {
     size_t parsed;
     http_connection* connection = (http_connection*)tcp->data;
@@ -261,13 +275,13 @@ void http_stream_on_read(uv_stream_t* tcp, ssize_t nread, const uv_buf_t* buf)
     free(buf->base);
 }
 
-int http_server_write_response(hw_write_context* write_context, hw_string* response)
+int http_server_write_response_single(hw_write_context* write_context, hw_string* response)
 {
     uv_write_t* write_req = (uv_write_t *)malloc(sizeof(*write_req) + sizeof(uv_buf_t));
     uv_buf_t* resbuf = (uv_buf_t *)(write_req+1);
     
     resbuf->base = response->value;
-    resbuf->len = response->length;// + 1;
+    resbuf->len = response->length;
     
     write_req->data = write_context;
     

@@ -12,7 +12,7 @@ using namespace v8;
 
 #define CRLF "\r\n"
 
-v8::Persistent<v8::Function> onRequestJsFnc;
+Nan::Persistent<v8::Function> onRequestJsFnc;
 
 void response_complete(void* user_data)
 {
@@ -31,41 +31,41 @@ KHASH_MAP_INIT_STR(string_hashmap, char*)
 
 void requestHandler(http_request* request, hw_http_response* response, void* user_data)
 {
-	NanScope();
+	Nan::HandleScope scope;
 	Response *resp = (Response*)malloc(sizeof(Response));
 	resp->request = request;
 	resp->response = response;
 	resp->user_data = user_data;
 	Local<External> external = v8::External::New(v8::Isolate::GetCurrent(), resp);
 	
-	Local<Object> jsReq = NanNew<Object>();
-	jsReq->Set(NanNew<String>("url"), NanNew<String>(request->url));
+	Local<Object> jsReq = Nan::New<Object>();
+	Nan::Set(jsReq, Nan::New<String>("url").ToLocalChecked(), Nan::New<String>(request->url).ToLocalChecked());
 	switch(request->method) {
 		case HW_HTTP_GET:
-			jsReq->Set(NanNew<String>("method"), NanNew<String>("GET")); break;
+			Nan::Set(jsReq, Nan::New<String>("method").ToLocalChecked(), Nan::New<String>("GET").ToLocalChecked()); break;
 		case HW_HTTP_POST:
-			jsReq->Set(NanNew<String>("method"), NanNew<String>("POST")); break;
+			Nan::Set(jsReq, Nan::New<String>("method").ToLocalChecked(), Nan::New<String>("POST").ToLocalChecked()); break;
 		case HW_HTTP_OPTIONS:
-			jsReq->Set(NanNew<String>("method"), NanNew<String>("OPTIONS")); break;
+			Nan::Set(jsReq, Nan::New<String>("method").ToLocalChecked(), Nan::New<String>("OPTIONS").ToLocalChecked()); break;
 		default:
-			jsReq->Set(NanNew<String>("method"), NanNew<String>("UNIMPLEMENTED")); break;
+			Nan::Set(jsReq, Nan::New<String>("method").ToLocalChecked(), Nan::New<String>("UNIMPLEMENTED").ToLocalChecked()); break;
 	}
 	
 	
 	const char* k;
 	const char* v;
-	Local<Object> jsHeaders = NanNew<Object>();
+	Local<Object> jsHeaders = Nan::New<Object>();
 
 	khash_t(string_hashmap) *h = (kh_string_hashmap_t*)request->headers;
 	kh_foreach(h, k, v, { 
 		// printf("KEY: %s VALUE: %s\n", k, v);
-		jsHeaders->Set(NanNew<String>(k), NanNew<String>(v));
+		jsHeaders->Set(Nan::New<String>(k).ToLocalChecked(), Nan::New<String>(v).ToLocalChecked());
 	});
 	
-	jsReq->Set(NanNew<String>("headers"), jsHeaders);
+	jsReq->Set(Nan::New<String>("headers").ToLocalChecked(), jsHeaders);
 	
-	Local<Object> jsRes = NanNew<Object>();
-	jsRes->Set(NanNew<String>("external"), external);
+	Local<Object> jsRes = Nan::New<Object>();
+	jsRes->Set(Nan::New<String>("external").ToLocalChecked(), external);
 	
 	Local<Value> argv[2] = {
 		jsReq,
@@ -74,7 +74,7 @@ void requestHandler(http_request* request, hw_http_response* response, void* use
 	
 	// hw_set_http_version(resp->response, 1, 1);
 	
-	NanNew(onRequestJsFnc)->Call(NanGetCurrentContext()->Global(), 2, argv);
+	Nan::New(onRequestJsFnc)->Call(Nan::GetCurrentContext()->Global(), 2, argv);
 	
 	// hw_string status_code;
 	// hw_string content_type_name;
@@ -111,46 +111,46 @@ void requestHandler(http_request* request, hw_http_response* response, void* use
 	// hw_http_response_send(response, user_dataStr, response_complete);
 }
 
-inline void allocStr(hw_string& target, NanUtf8String& str) {
+inline void allocStr(hw_string& target, Nan::Utf8String& str) {
 	target.length = str.length();
 	target.value = (char*)malloc(target.length);
 	memcpy(target.value, *str, target.length);
 }
 
 NAN_METHOD(JsEnd) {
-	NanScope();
+	Nan::HandleScope scope;
 	
 	hw_string body;
 	
-	Local<External> ext = args[0].As<External>();
+	Local<External> ext = info[0].As<External>();
 	void* ptr = ext->Value();
 	Response *resp =  static_cast<Response *>(ptr);
 	
 	hw_string status_code;
-	NanUtf8String statusCode(args[1]);
+	Nan::Utf8String statusCode(info[1]);
 	allocStr(status_code, statusCode);
 	hw_set_response_status_code(resp->response, &status_code);
 	
-	const Local<Array> props = v8::Handle<v8::Array>::Cast(args[2]);
+	const Local<Array> props = v8::Handle<v8::Array>::Cast(info[2]);
 	const uint32_t length = props->Length();
 	
 	hw_string *headers = (hw_string*)malloc(sizeof(hw_string)*length);
 	
 	for (uint32_t i=0 ; i<length ; i+=2)
 	{
-		//NanScope();
+		//Nan::HandleScope scope;
 		const Local<Value> k = props->Get(i);
-		NanUtf8String headerName(k);
+		Nan::Utf8String headerName(k);
 		allocStr(headers[i], headerName);
 		
 		const Local<Value> v = props->Get(i+1);
-		NanUtf8String headerValue(v);
+		Nan::Utf8String headerValue(v);
 		allocStr(headers[i+1], headerValue);
 		
 		hw_set_response_header(resp->response, &headers[i], &headers[i+1]);
 	}
 	
-	NanUtf8String bodyStr(args[3]);
+	Nan::Utf8String bodyStr(info[3]);
 	allocStr(body, bodyStr);
 	
 	hw_set_body(resp->response, &body);
@@ -165,41 +165,82 @@ NAN_METHOD(JsEnd) {
 	}
 	free(headers);
 	
-	NanReturnUndefined();
+	info.GetReturnValue().Set(Nan::Undefined());
+}
+
+void get_plaintext(http_request* request, hw_http_response* response, void* user_data)
+{
+    hw_string status_code;
+    hw_string content_type_name;
+    hw_string content_type_value;
+    hw_string body;
+    hw_string keep_alive_name;
+    hw_string keep_alive_value;
+    
+    SETSTRING(status_code, HTTP_STATUS_200);
+    hw_set_response_status_code(response, &status_code);
+    
+    SETSTRING(content_type_name, "Content-Type");
+    
+    SETSTRING(content_type_value, "text/html");
+    hw_set_response_header(response, &content_type_name, &content_type_value);
+    
+    SETSTRING(body, "123");
+    hw_set_body(response, &body);
+    
+    if (request->keep_alive)
+    {
+        SETSTRING(keep_alive_name, "Connection");
+        
+        SETSTRING(keep_alive_value, "Keep-Alive");
+		hw_set_response_keep_alive(response, true);
+        hw_set_response_header(response, &keep_alive_name, &keep_alive_value);
+    }
+    else
+    {
+        hw_set_http_version(response, 1, 0);
+    }
+    
+    hw_http_response_send(response, NULL, response_complete);
 }
 
 NAN_METHOD(JsListen) {
-	NanScope();
+	printf("JsListen\n");
+	Nan::HandleScope scope;
 	
-	NanUtf8String jsPort(args[0]);
-	Local<Function> jsFn = Local<Function>::Cast(args[1]);
-	NanAssignPersistent(onRequestJsFnc, jsFn);
+	Nan::Utf8String jsPort(info[0]);
+	Local<Function> jsFn = Local<Function>::Cast(info[1]);
+	onRequestJsFnc.Reset(jsFn);
 	
 	char route[] = "404";
 	configuration config;
+	config.parser = "http_parser";
 	config.http_listen_address = "0.0.0.0";
-	if((*jsPort)[0] == '/') {
-		char *buf = (char*)malloc(jsPort.length());
-		memcpy(buf, *jsPort, jsPort.length());
-		config.http_listen_port = 0;
-		config.unix_file = buf;
-	} else {
-		config.http_listen_port = atoi(*jsPort);
-		config.unix_file = NULL;
-	}
+	// if((*jsPort)[0] == '/') {
+	// 	char *buf = (char*)malloc(jsPort.length());
+	// 	memcpy(buf, *jsPort, jsPort.length());
+	// 	config.http_listen_port = 0;
+	// 	config.unix_file = buf;
+	// } else {
+	config.http_listen_port = atoi(*jsPort);
+		// config.unix_file = NULL;
+	// }
+	
+	config.thread_count = 0;
 
 	/* hw_init_from_config("hello_world.conf"); */
 	hw_init_with_config(&config);
-	hw_http_add_route(route, requestHandler, NULL);
-	hw_http_open(0);
+	//hw_http_add_route(route, requestHandler, NULL);
+	hw_http_add_route("/a", get_plaintext, NULL);
+	hw_http_open();
 	
-	// NanReturnValue(NanNew<String>("world"));
-	NanReturnUndefined();
+	// NanReturnValue(Nan::New<String>("world"));
+	info.GetReturnValue().Set(Nan::Undefined());
 }
 
 void init(Handle<Object> exports) {
-	NODE_SET_METHOD(exports, "listen", JsListen);
-	NODE_SET_METHOD(exports, "end", JsEnd);
+	Nan::SetMethod(exports, "listen", JsListen);
+	Nan::SetMethod(exports, "end", JsEnd);
 }
 
 NODE_MODULE(fast_node_http, init)

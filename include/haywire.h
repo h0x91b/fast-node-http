@@ -1,10 +1,12 @@
 #pragma once
 
 #ifdef __cplusplus
+#include <node.h>
 extern "C" {
 #endif
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #ifdef _WIN32
     /* Windows - set up dll import/export decorators. */
@@ -145,7 +147,9 @@ typedef struct
 {
     char* http_listen_address;
     int http_listen_port;
-	 char* unix_file;
+    int thread_count;
+    char* parser;
+    bool tcp_nodelay;
 } configuration;
 
 typedef struct
@@ -154,7 +158,7 @@ typedef struct
     unsigned short http_minor;
     unsigned char method;
     int keep_alive;
-    char* url;
+	char* url;
     void* headers;
     hw_string* body;
     int body_length;
@@ -167,13 +171,14 @@ typedef void (HAYWIRE_CALLING_CONVENTION *http_response_complete_callback)(void*
 
 HAYWIRE_EXTERN int hw_init_from_config(char* configuration_filename);
 HAYWIRE_EXTERN int hw_init_with_config(configuration* config);
-HAYWIRE_EXTERN int hw_http_open(int threads);
+HAYWIRE_EXTERN int hw_http_open();
 HAYWIRE_EXTERN void hw_http_add_route(char* route, http_request_callback callback, void* user_data);
 HAYWIRE_EXTERN char* hw_get_header(http_request* request, char* key);
 
 HAYWIRE_EXTERN void hw_free_http_response(hw_http_response* response);
 HAYWIRE_EXTERN void hw_set_http_version(hw_http_response* response, unsigned short major, unsigned short minor);
 HAYWIRE_EXTERN void hw_set_response_status_code(hw_http_response* response, hw_string* status_code);
+void hw_set_response_keep_alive(hw_http_response* response, bool keep_alive);
 HAYWIRE_EXTERN void hw_set_response_header(hw_http_response* response, hw_string* name, hw_string* value);
 HAYWIRE_EXTERN void hw_set_body(hw_http_response* response, hw_string* body);
 HAYWIRE_EXTERN void hw_http_response_send(hw_http_response* response, void* user_data, http_response_complete_callback callback);

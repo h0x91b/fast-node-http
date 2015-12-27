@@ -18,6 +18,7 @@ typedef struct
     int number_of_headers;
     hw_string body;
     int sent;
+    bool keep_alive;
 } http_response;
 
 hw_http_response hw_create_http_response(http_connection* connection);
