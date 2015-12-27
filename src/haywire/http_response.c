@@ -89,9 +89,9 @@ hw_string* create_response_buffer(hw_http_response* response)
     int line_sep_size = 2;
 
     int header_buffer_incr = 512;
-    int body_size = resp->body.length + (resp->keep_alive ? line_sep_size : 0);
+    int body_size = resp->body.length;
     int header_size_remaining = header_buffer_incr;
-    int response_size = header_size_remaining + sizeof(length_header) + num_chars(resp->body.length) + 2 * line_sep_size + body_size + (resp->keep_alive ? line_sep_size : 0);
+    int response_size = header_size_remaining + sizeof(length_header) + num_chars(resp->body.length) + 2 * line_sep_size + body_size + 1;
 
     response_string->value = malloc(response_size);
 

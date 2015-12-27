@@ -6,6 +6,11 @@
 			"target_name": "fast-node-http",
 			"product_name": "fast-node-http",
 			"msvs_guid": "5ECEC9E5-8F23-47B6-93E0-C3B328B3BE65",
+			"cflags": [
+				"-Wno-unused-variable", "-Wno-error=unused-variable",
+				"-Wno-unused-function", "-Wno-error=unused-function",
+				"-Wno-unused-const-variable", "-Wno-error=unused-const-variable"
+			],
 			"dependencies": [
 			],
 			"conditions": [

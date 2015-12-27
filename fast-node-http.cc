@@ -63,6 +63,10 @@ void requestHandler(http_request* request, hw_http_response* response, void* use
 	});
 	
 	jsReq->Set(Nan::New<String>("headers").ToLocalChecked(), jsHeaders);
+	if(request->body->length > 0)
+		jsReq->Set(Nan::New<String>("body").ToLocalChecked(), Nan::New<String>(request->body->value, request->body->length).ToLocalChecked());
+	else
+		jsReq->Set(Nan::New<String>("body").ToLocalChecked(), Nan::Null());
 	
 	Local<Object> jsRes = Nan::New<Object>();
 	jsRes->Set(Nan::New<String>("external").ToLocalChecked(), external);
@@ -176,6 +180,8 @@ void get_plaintext(http_request* request, hw_http_response* response, void* user
     hw_string body;
     hw_string keep_alive_name;
     hw_string keep_alive_value;
+	
+	printf("body: %d bytes `%s`\n", request->body->length, request->body->value);
     
     SETSTRING(status_code, HTTP_STATUS_200);
     hw_set_response_status_code(response, &status_code);
@@ -231,7 +237,7 @@ NAN_METHOD(JsListen) {
 	/* hw_init_from_config("hello_world.conf"); */
 	hw_init_with_config(&config);
 	//hw_http_add_route(route, requestHandler, NULL);
-	hw_http_add_route("/a", get_plaintext, NULL);
+	hw_http_add_route("404", requestHandler, NULL);
 	hw_http_open();
 	
 	// NanReturnValue(Nan::New<String>("world"));

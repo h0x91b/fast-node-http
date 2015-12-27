@@ -260,7 +260,7 @@ void get_404_response(http_request* request, http_response* response)
 int http_request_on_message_complete(http_parser* parser)
 {
     http_connection* connection = (http_connection*)parser->data;
-    hw_route_entry* route_entry = get_route_callback(connection->request->url);
+    hw_route_entry* route_entry = get_route_callback("404");//get_route_callback(connection->request->url);
     hw_string* response_buffer;
     hw_write_context* write_context;
     hw_http_response* response = hw_create_http_response(connection);
